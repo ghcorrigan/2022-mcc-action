@@ -17,16 +17,19 @@ parfor dataFileIdx = 1:length(dataFiles_beh)
     
     sessionName = {behFilename}; % Get the session name
     [ttx, ttx_history, trialEventTimes] =... % Index of trials and event timings
-        beh_getTrials(import_data.events.stateFlags_,import_data.events.Infos_);
+        beh_getTrials(import_data.events.stateFlags_,import_data.events.Infos_,import_data.eyes);
     [stopSignalBeh, ~] = beh_getStoppingInfo... % Stopping behavior
         (import_data.events.stateFlags_,import_data.events.Infos_,ttx);
-    trialEventTimes.ssrt = trialEventTimes.stopSignal_artifical + stopSignalBeh.ssrt.integrationWeighted;
+    trialEventTimes.ssrt = trialEventTimes.stopSignal_artifical + stopSignalBeh.ssrt{3}.integrationWeighted;
+    trialEventTimes.ssrtl = trialEventTimes.stopSignal_artifical + stopSignalBeh.ssrt{1}.integrationWeighted;
+    trialEventTimes.ssrth = trialEventTimes.stopSignal_artifical + stopSignalBeh.ssrt{2}.integrationWeighted;
     [ttm] = beh_getMatchedTrials(stopSignalBeh,ttx, trialEventTimes); % Trial matching indices
+    [ttseen] = beh_getSeenTrials(stopSignalBeh,ttx, trialEventTimes); % Trial matching indices
     
     % After extracting the individual behavioral variable, we then collapse
     % it into one structure for the given session.
     behavior(dataFileIdx) = struct('sessionName',sessionName,'ttx',ttx,'trialEventTimes',trialEventTimes,...
-        'stopSignalBeh',stopSignalBeh,'ttm',ttm,'ttx_history',ttx_history);
+        'stopSignalBeh',stopSignalBeh,'ttm',ttm,'ttx_history',ttx_history,'ttseen',ttseen);
     
 end
 

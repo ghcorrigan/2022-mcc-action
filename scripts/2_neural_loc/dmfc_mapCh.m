@@ -12,7 +12,7 @@ for session_i = 1:n_sessions
     fprintf(['Extracting data for ' neuralFilename ': session %i of %i     \n'],...
         session_i, n_sessions);
     
-    acs_ch_mapping = util_getACCchannels(logInfo,session_i);
+    acs_ch_mapping = util_getDMFCchannels(logInfo,session_i);
     
     spk_data = load(fullfile(dirs.data,[neuralFilename '-spk.mat']));
     
@@ -32,15 +32,18 @@ for session_i = 1:n_sessions
         noise = dajo_datamap_curated.spkInfo(session_i,1).unitInfo.flag_noise(neuron_i);
 
         spk_width = util_getSpkWidth(spk_data,dajo_datamap_curated.spkInfo(session_i,1).unitInfo.unitWAV{neuron_i});
-        
-        map_info(neuron_i,:) = table(session,monkey,unit,site,depth,area,ap,ml,mua,noise,spk_width);
+        probeName = dajo_datamap_curated.probes(session_i);
+        probeNum = str2double(probeName{1}(7:end-4));
+        probeUnit = neuron_i;
+
+        map_info(neuron_i,:) = table(session,monkey,unit,site,depth,area,ap,ml,mua,noise,spk_width,probeName,probeNum,probeUnit);
     end
     
     dmfc_map_info = [dmfc_map_info; map_info];
 end
 
 % Clear up unknown areas and remove noise clusters
-dmfc_map_info(~strcmp(dmfc_map_info.area,'?'),:) = [];
+% dmfc_map_info(strcmp(dmfc_map_info.area,'?'),:) = [];
 dmfc_map_info(dmfc_map_info.noise == 1,:) = [];
 
 dmfc_map_info.area = repmat({'DMFC'},size(dmfc_map_info,1),1);

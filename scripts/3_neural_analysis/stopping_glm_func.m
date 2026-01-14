@@ -49,20 +49,13 @@ for trial_i = 1:size(import_data.events.stateFlags_,1)
 end
 
 %% Setup spike data into GLM
-spk_data_in = load(fullfile('D:\projects\2022-mcc-action\data\','SDF',...
-    [neuralFilename '_SDF_' neuronLabel '.mat']));
+spk_data_in = load(fullfile('E:\conflict\data\','Spikes',...
+    [neuralFilename '_Spikes_' neuronLabel '.mat']));
 
 event_alignment = 'stopSignal_artifical';
 baseline_win = [-600:-100];
-
-z_sdf = zscore_sdf(spk_data_in.SDF,[-600:-100],event_alignment);
-
-window_size = 100;
-window_shift = 10;
-[window_sdf, window_time] = movaverage_sdf(z_sdf, window_size, window_shift);
-% 2023-08-26, 23h25: I tested this and it does the job correctly. The
-% z-scored profile looks exactly like the raw profile, and the movaverage
-% sdf looks like a smoothed version of the raw/zscored sdf.
+event_frs = calc_FRs_and_zscore(spk_data_in.Spikes,[-600:-100],event_alignment,...
+    [-50, 350],100,10);
 
 [n_trials, n_times] = size(window_sdf); % Get the number of windows in the time averaged data
 

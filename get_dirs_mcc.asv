@@ -1,0 +1,24 @@
+function dirs = get_dirs_mcc(user)
+
+switch user
+    case 'robarts'
+        dirs.root = 'E:\conflict';
+        dirs.toolbox = 'E:\conflict\analyses\toolbox';
+        dirs.dajo_toolbox = 'E:\cmand\analyses\2022-dajo-toolbox-main';
+        dirs.data = '/Volumes/Alpha/data/2021_Cmand_DaJo';
+        
+    case 'home'
+        dirs.root = 'D:\projects\2022-mcc-action';
+        dirs.toolbox = 'D:\projects\toolbox\';
+        dirs.dajo_toolbox = 'D:\projects\2022-dajo-toolbox';
+        dirs.data = 'D:\data\2021_Cmand_DaJo';
+       
+end
+
+addpath(genpath(dirs.root));
+addpath(genpath(dirs.toolbox));
+addpath(genpath(dirs.dajo_toolbox));
+addpath(genpath(dirs.data));
+
+end
+

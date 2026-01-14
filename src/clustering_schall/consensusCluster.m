@@ -151,7 +151,10 @@ if ~exist('respSumStruct','var')
                         fprintf(repmat('\b',1,length(printStr)));
                         printStr = sprintf('Clustering combination %d of %d...\n',nDone,nNeeded);
                         fprintf(printStr);
-                        [respK,respClustIDs,respGap,respGapErr,linkMat,linkInd, distMat, respIn] = indivResponseCluster(goodSDF,allTimeCell,'norm',respNorms{in},'sim',respSims{is},'rand',respRand{ir},'resp',respInclude{ii},'z',zResp(iz),'-n',minN,'-r',randReps,'-e',myEpocs,'ei',myEpocInds,'rw',myEpocWinds,'sd',normSD,'do',distOnly);
+                        [respK,respClustIDs,respGap,respGapErr,linkMat,linkInd, distMat, respIn] =...
+                            indivResponseCluster(goodSDF,allTimeCell,'norm',respNorms{in},'sim',respSims{is},'rand',...
+                            respRand{ir},'resp',respInclude{ii},'z',zResp(iz),'-n',minN,'-r',randReps,'-e',myEpocs,'ei',...
+                            myEpocInds,'rw',myEpocWinds,'sd',normSD,'do',distOnly);
                         % Save parameters and results
                         respSumStruct(nDone).ids        = respClustIDs;
                         respSumStruct(nDone).gap        = respGap;

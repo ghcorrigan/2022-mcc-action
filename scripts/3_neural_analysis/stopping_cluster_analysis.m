@@ -18,7 +18,7 @@ end
 inputSDF = [];
 inputSDF = {diff_sdf_in};
 
-sdfTimes = {[-1000:2000]};
+sdfTimes = {[-1000:1000]};
 sdfEpoch = {[0:600]};
 
 colorMapping = [1,1];

@@ -1,11 +1,11 @@
 function dirs = get_dirs_mcc(user)
 
 switch user
-    case 'mac'
-        dirs.root = '/Users/stevenerrington/Desktop/Projects/2022-mcc-action';
-        dirs.toolbox = '/Users/stevenerrington/Desktop/Projects/toolbox';
-        dirs.dajo_toolbox = '/Users/stevenerrington/Desktop/Projects/2022-dajo-toolbox';
-        dirs.data = '/Volumes/Alpha/data/2021_Cmand_DaJo';
+    case 'robarts'
+        dirs.root = 'E:\conflict\analyses';
+        dirs.toolbox = 'E:\conflict\analyses\toolbox';
+        dirs.dajo_toolbox = 'E:\conflict\analyses\2022-dajo-toolbox-main';
+        dirs.data = 'E:\conflict\data';
         
     case 'home'
         dirs.root = 'D:\projects\2022-mcc-action';

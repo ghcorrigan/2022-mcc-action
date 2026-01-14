@@ -1,9 +1,9 @@
 function acs_ch_mapping = util_getACCchannels(logInfo,session_i)
 
 acs_ch = logInfo.acs_ch(session_i);
-if acs_ch == 0
-   acs_ch = NaN; 
-end
+% if acs_ch == 0
+%    acs_ch = NaN; 
+% end
 
 
 acc_ch(:,1) = 1:32;
@@ -30,8 +30,14 @@ labels = [repmat({'dMCC'},n_dMCC_ch,1);...
     {'ACS'};repmat({'vMCC'},n_vMCC_ch,1)];
 elseif n_dMCC_ch == 0 & n_vMCC_ch > 0
     labels = [{'ACS'};repmat({'vMCC'},n_vMCC_ch,1)];
+    if length(labels)>32
+        labels = labels(end-31:end);
+    end
 elseif n_vMCC_ch == 0 & n_dMCC_ch > 0
     labels = [repmat({'dMCC'},n_dMCC_ch,1);{'ACS'}];
+    if length(labels)>32
+        labels(33:end)=[];
+    end
 else
     labels = repmat({'?'},32,1);
 end

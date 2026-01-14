@@ -2,6 +2,7 @@ timewins.sdf = [-1000:2000];
 timewins.zero = abs(timewins.sdf(1));
 timewins.ssrt_baseline = [-100:0];
 timewins.ssrt_comp = [-50:250];
+timewins.ssrt_comp = [-100:300];
 
 %% Admin: Get trial/session counts, etc...
 clear monkey nTrials
@@ -33,11 +34,11 @@ unique(mcc_map_info.session)
 
 %% Compare SSRT
 clear monkey nTrials
-for beh_session_i = 1:size(behavior,2)
-    ssrt(beh_session_i,1) = behavior(beh_session_i).stopSignalBeh.ssrt.integrationWeighted;
-    nTrials(beh_session_i,1) = size(behavior(beh_session_i).trialEventTimes,1);
+for beh_session_i = 1:size(behavior,1)
+    ssrt(beh_session_i,1) = behavior.stopSignalBeh(beh_session_i).ssrt.integrationWeighted;
+    nTrials(beh_session_i,1) = size(behavior.trialEventTimes{beh_session_i},1);
     
-    datamapIdx = find(strcmp(dajo_datamap_curated.sessionBeh,behavior(beh_session_i).sessionName(1:end-4)),1);
+    datamapIdx = find(strcmp(dajo_datamap_curated.sessionBeh,behavior.sessionName{beh_session_i}(1:end-4)),1);
     monkey{beh_session_i,1} = dajo_datamap_curated.monkey{datamapIdx};
 end
 
@@ -60,7 +61,7 @@ histogram(ssrt(strcmp(monkey,'dar')),10:10:180)
 
 %% Extract: Get latency-matched SDF for non-canceled trials
 parfor neuron_i = 1:size(mcc_map_info,1)
-    
+
     neuralFilename = mcc_map_info.session{neuron_i};
     neuronLabel = mcc_map_info.unit{neuron_i};
     fprintf('Extracting: %s - %s ... [%i of %i]  \n',neuralFilename,neuronLabel,neuron_i,size(mcc_map_info,1))
@@ -70,7 +71,7 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     behaviorIdx = find(strcmp(dataFiles_beh,behFilename(1:end-4)));
     
     % Load in pre-processed spike data
-    data_in = load(fullfile('D:\projects\2022-mcc-action\data\','SDF',...
+    data_in = load(fullfile('E:\conflict\data\','SDF',...
         [neuralFilename '_SDF_' neuronLabel '.mat']));
     
     sdf_canceled_targetx = []; sdf_nostop_targetx = [];
@@ -79,9 +80,9 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     sdf_canceled_tonex = []; sdf_nostop_tonex = [];
     
     % Latency match
-    for ssd_i = 1:length(behavior(behaviorIdx,:).stopSignalBeh.inh_SSD)
-        trl_canceled = []; trl_canceled = behavior(behaviorIdx,:).ttm.C.C{ssd_i};
-        trl_nostop = []; trl_nostop = behavior(behaviorIdx,:).ttm.C.GO{ssd_i};
+    for ssd_i = 1:length(behavior.stopSignalBeh(behaviorIdx,:).inh_SSD)
+        trl_canceled = []; trl_canceled = behavior.ttm(behaviorIdx,:).C.C{ssd_i};
+        trl_nostop = []; trl_nostop = behavior.ttm(behaviorIdx,:).C.GO{ssd_i};
         
         if length(trl_canceled) < 10 | length(trl_nostop) < 10
             sdf_canceled_ssdx(ssd_i,:) = nan(1,length(-1000:2000));
@@ -93,6 +94,9 @@ parfor neuron_i = 1:size(mcc_map_info,1)
             % SSD:
             sdf_canceled_ssdx(ssd_i,:) = nanmean(data_in.SDF.stopSignal_artifical(trl_canceled,:));
             sdf_nostop_ssdx(ssd_i,:) = nanmean(data_in.SDF.stopSignal_artifical(trl_nostop,:));
+            % - SSRT
+            sdf_canceled_ssrtx(ssd_i,:) = nanmean(data_in.SDF.ssrt(trl_canceled,:));
+            sdf_nostop_ssrtx(ssd_i,:) = nanmean(data_in.SDF.ssrt(trl_nostop,:));
             % Tone:
             sdf_canceled_tonex(ssd_i,:) = nanmean(data_in.SDF.tone(trl_canceled,:));
             sdf_nostop_tonex(ssd_i,:) = nanmean(data_in.SDF.tone(trl_nostop,:));
@@ -100,12 +104,15 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     end
     
     trl_noncanceled = [];
-    trl_noncanceled = behavior(behaviorIdx,:).ttx.noncanceled.all.all;
+    trl_noncanceled = behavior.ttx(behaviorIdx,:).noncanceled.all.all;
     
     % Get mean SDF for:
     % - Target
     sdf_canceled_all_target(neuron_i,:) = nanmean(sdf_canceled_targetx);
     sdf_nostop_all_target(neuron_i,:) = nanmean(sdf_nostop_targetx);
+    % - SSRT
+    sdf_canceled_all_ssrt(neuron_i,:) = nanmean(sdf_canceled_ssrtx);
+    sdf_nostop_all_ssrt(neuron_i,:) = nanmean(sdf_nostop_ssrtx);
     % - Stop-signal
     sdf_canceled_all_stopsignal(neuron_i,:) = nanmean(sdf_canceled_ssdx);
     sdf_nostop_all_stopsignal(neuron_i,:) = nanmean(sdf_nostop_ssdx);
@@ -114,7 +121,22 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     sdf_canceled_all_tone(neuron_i,:) = nanmean(sdf_canceled_tonex);
     sdf_nostop_all_tone(neuron_i,:) = nanmean(sdf_nostop_tonex);
     sdf_noncanc_all_tone(neuron_i,:) = nanmean(data_in.SDF.tone(trl_noncanceled,:));
-
+     % Error ---- IN PROGRESS
+    sdf_nostop_saccade(neuron_i,:) = nanmean(data_in.SDF.saccade(behavior(behaviorIdx,:).ttx.nostop.all.all,:));
+    sdf_noncanc_saccade(neuron_i,:) = nanmean(data_in.SDF.saccade(behavior(behaviorIdx,:).ttx.noncanceled.all.all,:));
+        
+    
+    % Value ---- IN PROGRESS
+    sdf_canceled_hi_stopsignal(neuron_i,:) = nanmean(data_in.SDF.stopSignal_artifical(behavior(behaviorIdx,:).ttx.canceled.all.hi,:));
+    sdf_canceled_lo_stopsignal(neuron_i,:) = nanmean(data_in.SDF.stopSignal_artifical(behavior(behaviorIdx,:).ttx.canceled.all.lo,:));
+    sdf_nostop_hi_stopsignal(neuron_i,:) = nanmean(data_in.SDF.stopSignal_artifical(behavior(behaviorIdx,:).ttx.nostop.all.hi,:));
+    sdf_nostop_lo_stopsignal(neuron_i,:) = nanmean(data_in.SDF.stopSignal_artifical(behavior(behaviorIdx,:).ttx.nostop.all.lo,:));
+    
+    % Trial history ---- IN PROGRESS
+    sdf_post_canc_target(neuron_i,:) = nanmean(data_in.SDF.target(behavior(behaviorIdx,:).ttx_history.NS_after_C,:));
+    sdf_post_nostop_target(neuron_i,:) = nanmean(data_in.SDF.target(behavior(behaviorIdx,:).ttx_history.NS_after_NS,:));
+    sdf_post_noncanc_target(neuron_i,:) = nanmean(data_in.SDF.target(behavior(behaviorIdx,:).ttx_history.NS_after_NC,:));
+  
     % Save SSD specific activity, just incase.
     sdf_canceled_ssd{neuron_i} = sdf_canceled_ssdx;
     sdf_nostop_ssd{neuron_i} = sdf_nostop_ssdx;
@@ -133,16 +155,18 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     behaviorIdx = find(strcmp(dataFiles_beh,behFilename(1:end-4)));
     
     % Load in pre-processed spike data
-    data_in = load(fullfile(dirs.root,'data','SDF',...
-        [neuralFilename '_SDF_' neuronLabel '.mat']));
     
+    data_in = load(fullfile(dirs.root,'data','Spikes',...
+        [neuralFilename '_Spikes_' neuronLabel '.mat']));
     trl_canceled = []; trl_nostop = [];
-    trl_canceled = behavior(behaviorIdx,:).ttx.canceled.all.all;
-    trl_nostop = behavior(behaviorIdx,:).ttx.nostop.all.all;
+    trl_canceled = behavior.ttx(behaviorIdx,:).canceled.all.all;
+    trl_nostop = behavior.ttx(behaviorIdx,:).nostop.all.all;
     
     canc_sdf_mean = []; nostop_sdf_mean = [];
-    canc_sdf_mean = nanmean(data_in.SDF.ssrt(trl_canceled,timewins.ssrt_comp+timewins.zero),2);
-    nostop_sdf_mean = nanmean(data_in.SDF.ssrt(trl_nostop,timewins.ssrt_comp+timewins.zero),2);
+     shiftedRaster = cellfun(@(x) x+1000,data_in.Spikes.ssrt,'uni',0);
+    all_raster = generateRaster(shiftedRaster, 1000:1500,3000);
+    canc_sdf_mean = nanmean(all_raster(trl_canceled,timewins.ssrt_comp+timewins.zero),2);
+    nostop_sdf_mean = nanmean(all_raster(trl_nostop,timewins.ssrt_comp+timewins.zero),2);
     
     [h,p,~,stats] = ttest2(canc_sdf_mean,nostop_sdf_mean);
     mean_canceled = nanmean(canc_sdf_mean); mean_nostop = nanmean(nostop_sdf_mean);
@@ -169,15 +193,20 @@ inputSDF_tone = {sdf_canceled_all_tone(inputNeurons,:),sdf_nostop_all_tone(input
 
 sdfTimes = {sdfWindow, sdfWindow};
 sdfEpoch = {[-200:600],[-200:600]};
+a = 800:1600;
+myEpocWinds = { a,a};
 
 colorMapping = [1,2];
 
 [sortIDs,idxDist, raw, respSumStruct, rawLink,myK] =...
-    consensusCluster(inputSDF_ssrt,sdfTimes,'-e',sdfEpoch,'-ei',colorMapping);
+    consensusCluster(inputSDF_ssrt,sdfTimes,'-e',sdfEpoch,'-ei',colorMapping,'-er',myEpocWinds);
 normResp_target = scaleResp(inputSDF_target,sdfTimes,'max','-bl',blWindow);
 normResp_stopSignal = scaleResp(inputSDF_ssd,[sdfTimes, timewins.sdf],'max','-bl',blWindow);
 normResp_ssrt = scaleResp(inputSDF_ssrt,sdfTimes,'max','-bl',blWindow);
 normResp_tone = scaleResp(inputSDF_tone,[sdfTimes, timewins.sdf],'max','-bl',blWindow);
+% on scaled responses
+[sortIDs,idxDist, raw, respSumStruct, rawLink,myK] =...
+    consensusCluster(normResp_ssrt,sdfTimes,'-e',sdfEpoch,'-ei',colorMapping,'-er',myEpocWinds);
 
 normResp_error = scaleResp(...
     {sdf_nostop_saccade(inputNeurons,:),sdf_noncanc_saccade(inputNeurons,:)},...
@@ -192,7 +221,8 @@ normResp_trialhistory = scaleResp(...
     {sdf_post_canc_target(inputNeurons,:),sdf_post_nostop_target(inputNeurons,:),...
     sdf_post_noncanc_target(inputNeurons,:)},repmat({timewins.sdf},3,1),'max','-bl',blWindow);
 
-nClusters_manual = 4; clusterNeurons = [];
+nClusters_manual =6; clusterNeurons = [];
+% nClusters_manual = myK; clusterNeurons = [];
 for cluster_i = 1:nClusters_manual
     clusterNeurons{cluster_i} = find(sortIDs(:,nClusters_manual) == cluster_i );
 end
@@ -215,7 +245,7 @@ end
 imagesc(raw(outPerm,outPerm));
 colormap(gray);
 xlabel('Unit Number'); set(gca,'YAxisLocation','Left');
-xticks([0:100:end]); yticks([0:100:end])
+% xticks([0:100:end]); yticks([0:100:end])
 
 % Figure: Cluster population SDF
 norm_sdf_list = {normResp_target,normResp_stopSignal,normResp_ssrt,normResp_tone};
@@ -360,9 +390,9 @@ for cluster_i = 1:nClusters_manual
         count = count + 1;
         behFilename = data_findBehFile(mcc_map_info.session{neuron_list(neuron_list_i)});
         behaviorIdx = find(strcmp(dataFiles_beh,behFilename(1:end-4)));
-        ssrt = round(behavior(behaviorIdx,:).stopSignalBeh.ssrt.integrationWeighted);
+        ssrt = round(behavior.stopSignalBeh(behaviorIdx,:).ssrt.integrationWeighted);
         
-        mid_ssd_idx = behavior(behaviorIdx,:).stopSignalBeh.midSSDidx;
+        mid_ssd_idx = behavior.stopSignalBeh(behaviorIdx,:).midSSDidx;
         
         conflict_epoch = []; conflict_epoch = [-50:50]+ssrt+timewins.zero;
         
@@ -388,9 +418,9 @@ for cluster_i = 1:nClusters_manual
         ssd_sdf_all_nostop{cluster_i,2}(neuron_list_i,:) = sdf_nostop_ssd{neuron_i}(mid_ssd_idx,:)./sdf_max;
         ssd_sdf_all_nostop{cluster_i,3}(neuron_list_i,:) = sdf_nostop_ssd{neuron_i}(mid_ssd_idx+1,:)./sdf_max;       
         
-        early_ssd_ssd = behavior(behaviorIdx,:).stopSignalBeh.inh_SSD(mid_ssd_idx-1);
-        mid_ssd_ssd = behavior(behaviorIdx,:).stopSignalBeh.inh_SSD(mid_ssd_idx);
-        late_ssd_ssd = behavior(behaviorIdx,:).stopSignalBeh.inh_SSD(mid_ssd_idx+1);
+        early_ssd_ssd = behavior.stopSignalBeh(behaviorIdx,:).inh_SSD(mid_ssd_idx-1);
+        mid_ssd_ssd = behavior.stopSignalBeh(behaviorIdx,:).inh_SSD(mid_ssd_idx);
+        late_ssd_ssd = behavior.stopSignalBeh(behaviorIdx,:).inh_SSD(mid_ssd_idx+1);
         
         early_ssd_pnc = behavior(behaviorIdx,:).stopSignalBeh.inh_pnc(mid_ssd_idx-1);
         mid_ssd_pnc = behavior(behaviorIdx,:).stopSignalBeh.inh_pnc(mid_ssd_idx);

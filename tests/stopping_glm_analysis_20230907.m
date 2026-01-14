@@ -8,9 +8,17 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     fprintf('Extracting: %s - %s ... [%i of %i]  \n',neuralFilename,neuronLabel,neuron_i,size(mcc_map_info,1))
     warning off
     [glm_out_mcc{neuron_i,1}, encoding_flag_mcc(neuron_i,:), encoding_beta_mcc(neuron_i,:)] =...
-        stopping_glm_func(neuron_i, mcc_map_info, dataFiles_beh, dirs);
+        stopping_glm_func_fr(neuron_i, mcc_map_info, dataFiles_beh, dirs);
 end
 
+parfor neuron_i = 1:size(mcc_map_info,1)
+    neuralFilename = mcc_map_info.session{neuron_i};
+    neuronLabel = mcc_map_info.unit{neuron_i};
+    fprintf('Extracting: %s - %s ... [%i of %i]  \n',neuralFilename,neuronLabel,neuron_i,size(mcc_map_info,1))
+    warning off
+    [glm_out_mccB{neuron_i,1}, encoding_flag_mccB(neuron_i,:), encoding_beta_mccB(neuron_i,:)] =...
+        stopping_glm_func_fr_baseline(neuron_i, mcc_map_info, dataFiles_beh, dirs);
+end
 
 %% Extract stop-related spike density functions
 parfor neuron_i = 1:size(mcc_map_info,1)
@@ -24,7 +32,7 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     behaviorIdx = find(strcmp(dataFiles_beh,behFilename(1:end-4)));
     
     % Load in pre-processed spike data
-    data_in = load(fullfile('D:\projects\2022-mcc-action\data\','SDF',...
+    data_in = load(fullfile('E:\conflict\data\','SDF',...
         [neuralFilename '_SDF_' neuronLabel '.mat']));
     
     event_alignment = 'stopSignal_artifical';
@@ -82,11 +90,11 @@ mcc_analysis_table.glm_value_canc = encoding_flag_mcc(:,3);
 
 %% Index GLM +ve neurons
 trial_type_neurons = [];
-trial_type_neurons = find(mcc_analysis_table.glm_trial == 1);
+trial_type_neurons = find(mcc_analysis_table.glm_ssd_canc == 1);
 
 %% Find modulation direction
-glm_times = [0:10:600];
-glm_index_ref = [96:156];
+glm_times = [0:10:300];
+glm_index_ref = [1:31];
 modulation_window = [0:600];
 
 for neuron_i = 1:size(trial_type_neurons,1)
@@ -142,7 +150,9 @@ for trial_type_i = {'nostop','canceled'}
                 
                 
                 subplot(n_plot_x, n_plot_y, plot_i); hold on
-                plot(-1000:2000, nanmean(mcc_analysis_table.sdf_canceled{neuron_j}),'color',colors.canceled)
+                plot(-1000:2000, mcc_analysis_table.sdf_canceled{neuron_j}),'color',colors.canceled)
+                plot(-1000:2000, mcc_analysis_table.sdf_canceled{neuron_j}),'color',colors.canceled)
+                plot(-1000:2000, mcc_analysis_table.sdf_canceled{neuron_j}),'color',colors.canceled)
                 plot(-1000:2000, nanmean(mcc_analysis_table.sdf_nostop{neuron_j}),'color',colors.nostop)
                 %             plot(-1000:2000, nanmean(mcc_analysis_table.sdf_noncanc{neuron_j}),'color',colors.noncanc)
                 xlim([-200 1000]); vline(0,'k-')

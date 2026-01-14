@@ -1,0 +1,16 @@
+function ephysLog = importOnlineEphysLogMaster()
+sessionSheet = GetGoogleSpreadsheet('12sKiqzLW4CCqG5wsXeBE8-CsN5np5Tw1iWWgm3h9nv8');
+ephysLog = cell2table(sessionSheet(2:end,:),'VariableNames',sessionSheet(1,:));
+
+probeInds = find(cellfun(@(x) contains(x,'1'),ephysLog.spk_session));
+S = dir('E:\conflict\results\probeTTM');
+S = S(~[S.isdir]);
+[~,idx] = sort([S.datenum]);
+S = S(idx);
+probeLabels = {S(:).name};
+probeLabels = cellfun(@(x) x(5:end),probeLabels,'uni',0);
+
+ephysLog.probeLabel(probeInds) = probeLabels;
+
+
+end

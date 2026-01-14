@@ -9,7 +9,7 @@
 clear all; close all; clc; beep off; warning off;
 
 % Define paths & key directories
-system_id = 'home';
+system_id = 'robarts';
 dirs = get_dirs_mcc(system_id);
 getColors_mcc; % Define colorschemes
 

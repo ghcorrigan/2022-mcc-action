@@ -32,8 +32,9 @@ for session_i = 1:n_sessions
         noise = dajo_datamap_curated.spkInfo(session_i,1).unitInfo.flag_noise(neuron_i);
 
         spk_width = util_getSpkWidth(spk_data,dajo_datamap_curated.spkInfo(session_i,1).unitInfo.unitWAV{neuron_i});
+        probeName = dajo_datamap_curated.probes(session_i);
         
-        map_info(neuron_i,:) = table(session,monkey,unit,site,depth,area,ap,ml,mua,noise,spk_width);
+        map_info(neuron_i,:) = table(session,monkey,unit,site,depth,area,ap,ml,mua,noise,spk_width,probeName);
     end
     
     mcc_map_info = [mcc_map_info; map_info];

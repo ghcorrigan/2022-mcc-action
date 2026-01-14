@@ -1,0 +1,371 @@
+function [glm_output, encoding_flag, encoding_beta] = ...
+    stopping_glm_func_fr(neuron_i, mcc_map_info, dataFiles_beh, dirs,behData)
+
+neuralFilename = mcc_map_info.session{neuron_i};
+neuronLabel = mcc_map_info.unit{neuron_i};
+fprintf('Extracting: %s - %s ... [%i of %i]  \n',neuralFilename,neuronLabel,neuron_i,size(mcc_map_info,1))
+
+%... and find the corresponding behavior file index
+behFilename = data_findBehFile(neuralFilename);
+behaviorIdx = find(strcmp(dataFiles_beh,behFilename(1:end-4)));
+
+% Load in pre-processed spike data
+import_data = struct(); import_data = load_behFile(dirs,behFilename);
+regAlpha = .1;
+load(['E:\conflict\results\DATA_SPK_STATIONARITY\Ben\stationarityData_' mcc_map_info.probeName{neuron_i}])
+load(['E:\conflict\results\probeTrls\neuronData_' mcc_map_info.probeName{neuron_i}])
+tempInd = find(contains(neuronData.DSPname,neuronLabel));
+stationInd = find(stationaritySelection.included_trials.neuronIdx == tempInd);
+
+%% Extract: get relevant data for GLM table
+reg_tbl = table;
+
+for trial_i = 1:size(import_data.events.stateFlags_,1)
+    
+    % Trial type ---------------------------
+    % - No-stop trials
+    if import_data.events.stateFlags_.IsGoCorrect(trial_i) == 1
+        reg_tbl.trial_type(trial_i) = 1;
+    % - Canceled trials
+    elseif import_data.events.stateFlags_.IsCancel(trial_i) == 1
+        reg_tbl.trial_type(trial_i) = 2;
+    % - Non-canceled trials
+    elseif import_data.events.stateFlags_.IsNonCancelledNoBrk(trial_i) == 1 ||...
+            import_data.events.stateFlags_.IsNonCancelledBrk(trial_i) == 1
+        reg_tbl.trial_type(trial_i) = 3;
+        if isnan(behData.trialEventTimes{1}.stopSignal(trial_i))
+            %unseen
+            reg_tbl.seen(trial_i) = 0;
+        else
+            %seen
+            reg_tbl.seen(trial_i) = 1;
+            
+        end
+    % - Abort trials
+    else
+        reg_tbl.trial_type(trial_i) = 0;
+    end
+    
+    % Stop signal delay ---------------------------
+    reg_tbl.ssd(trial_i) = import_data.events.stateFlags_.UseSsdIdx(trial_i);
+    
+    % Value ---------------------------------------
+    if import_data.events.stateFlags_.IsLoRwrd(trial_i) == 1
+        reg_tbl.value(trial_i) = 1;
+    else
+        reg_tbl.value(trial_i) = 2;
+    end
+    
+    % Trial Number ---------------------------------------
+    reg_tbl.trial_number(trial_i) = import_data.events.stateFlags_.TrialNumber(trial_i);
+    
+end
+goodtrls = false(height(reg_tbl),1);
+goodtrls(stationaritySelection.included_trials.trials{stationInd}) = true;
+%check what the shortest SSD is, and if shorter than 80ms, it gets removed
+if behData.stopSignalBeh.inh_SSD(1)<80
+goodtrls(reg_tbl.ssd==0 ) = false;
+end
+tooFew = find(cellfun(@length, behData.stopSignalBeh.ssd_ttx.C)<10);
+if ~isempty(tooFew)
+for ii = 1:length(tooFew)
+    goodtrls(reg_tbl.ssd==tooFew(ii)-1) = false;
+end
+end
+if height(reg_tbl(goodtrls,:))==0 || sum(reg_tbl.trial_type(goodtrls)==2)<30
+    glm_output.trial_type.sig_times = [];
+    glm_output.trial_type.beta_weights = [];
+    glm_output.trial_type.permPos =[];
+    glm_output.trial_type.pvals =[];
+    glm_output.ssd.sig_times = [];
+    glm_output.ssd.beta_weights = [];
+    glm_output.ssd.permPos = [];
+    glm_output.ssd.permSig = [];
+    glm_output.ssd.pvals = [];
+    glm_output.seen.sig_times = [];
+    glm_output.seen.beta_weights = [];
+    glm_output.nonCanc.sig_times = [];
+    glm_output.nonCanc.beta_weights = [];
+    encoding_flag = zeros(1,5); encoding_beta = zeros(1,4);
+    remove = 1;
+    return
+end
+%% Setup spike data into GLM
+spk_data_in = load(fullfile('E:\conflict\data\','Spikes',...
+    [neuralFilename '_Spikes_' neuronLabel '.mat']));
+window_shift = 10;
+fr_window = 100;
+event_alignment = 'ssrt';
+baseline_win = [-600:-500];
+[event_frs,sdfs] = calc_FRs_and_zscore(spk_data_in.Spikes,baseline_win,event_alignment,...
+    [-50, 350],fr_window,window_shift);
+
+[~, n_times] = size(event_frs); % Get the number of windows in the time averaged data
+
+reg_tbl.win_fr = event_frs; % Add the firing rate over this whole window to the GLM table
+
+%% Run GLM: trial type
+glm_output.trial_type.sig_times = []; 
+glm_output.trial_type.beta_weights = []; 
+glm_output.trial_type.permPos = zeros(1,n_times); 
+glm_output.trial_type.pvals = zeros(1,n_times); 
+u_t_mdl = [];
+reg_tbl.is_canc = reg_tbl.trial_type==2;
+reg_tbl.trl_numZ = zscore(reg_tbl.trial_number);
+trlInds = reg_tbl.trial_number;
+matchedInds = trlMatcherCanc(behData);
+matchedInds = trlInds(ismember(trlInds,matchedInds));
+goodTrlNums = find(goodtrls);
+goodMatchedInd = goodTrlNums(ismember(goodTrlNums,matchedInds));
+
+reg_tbl_trialtype = reg_tbl(goodMatchedInd,:);
+reg_tbl_nonCanc = reg_tbl(reg_tbl.trial_type == 2 | reg_tbl.trial_type == 3,:);
+
+% For each averaged time point
+for timepoint_i = 1:n_times
+    
+    % Input the timepoint specific firing times
+    reg_tbl_trialtype.firing_rate =  reg_tbl_trialtype.win_fr(:,timepoint_i);
+    
+    % Fit the GLM for this
+   
+    u_t_mdl = fitlm(reg_tbl_trialtype,'firing_rate ~ is_canc + trl_numZ');
+    
+    for jj = 1:500
+        reg_tbl_trialtype.isCancP = randsample(reg_tbl_trialtype.is_canc, height(reg_tbl_trialtype));
+        perm_t_mdl = fitlm(reg_tbl_trialtype,'firing_rate ~ isCancP + trl_numZ');
+        coeffs(jj) = perm_t_mdl.Coefficients.Estimate(3);
+    end
+   
+    permLoc = length(find(coeffs<u_t_mdl.Coefficients.Estimate(2)));
+    % GLM output ---------------------------------
+    % - Trial type
+    glm_output.trial_type.sig_times(1,timepoint_i) = u_t_mdl.Coefficients.pValue(2) < regAlpha; % trial type
+    glm_output.trial_type.pvals(1,timepoint_i) = u_t_mdl.Coefficients.pValue(2); % trial type
+    glm_output.trial_type.beta_weights(1,timepoint_i) = u_t_mdl.Coefficients.tStat(2); % trial type
+    glm_output.trial_type.permPos(1,timepoint_i) = permLoc; % trial type
+
+    % - Trial number
+    glm_output.trial_type.sig_times(2,timepoint_i) = u_t_mdl.Coefficients.pValue(3) < .01; % trial_number
+    glm_output.trial_type.beta_weights(2,timepoint_i) = u_t_mdl.Coefficients.tStat(3); % trial_number
+    
+end
+
+%% Run GLM: stop_signal delay
+glm_output.ssd.sig_times = zeros(1,n_times); 
+glm_output.ssd.beta_weights = zeros(1,n_times); 
+glm_output.ssd.permPos = zeros(1,n_times);
+glm_output.ssd.permSig = zeros(1,n_times);
+glm_output.ssd.pvals = zeros(1,n_times);
+u_t_mdl = [];
+
+matchedInds = find(reg_tbl.trial_type == 2);
+goodMatchedInd = goodTrlNums(ismember(goodTrlNums,matchedInds));
+
+reg_tbl_stopping = reg_tbl(goodMatchedInd,:);
+
+sigPermTimes = find(abs(glm_output.trial_type.permPos-250)>238 |...
+    glm_output.trial_type.pvals < .1);
+
+% For each averaged time point
+for timepoint_i = sigPermTimes
+    
+    % Input the timepoint specific firing times
+    reg_tbl_stopping.firing_rate = reg_tbl_stopping.win_fr(:,timepoint_i); 
+    
+    % Fit the GLM for this
+    u_t_mdl = fitlm(reg_tbl_stopping,'firing_rate ~ ssd + trl_numZ');
+    
+    for jj = 1:500
+        reg_tbl_stopping.ssdP = randsample(reg_tbl_stopping.ssd, height(reg_tbl_stopping));
+        perm_t_mdl = fitlm(reg_tbl_stopping,'firing_rate ~ ssdP + trl_numZ');
+        coeffs(jj) = perm_t_mdl.Coefficients.Estimate(3);
+    end
+   
+    permLoc = length(find(coeffs<u_t_mdl.Coefficients.Estimate(2)));
+    % GLM output ---------------------------------   
+    % - Stop-signal delay
+    glm_output.ssd.sig_times(1,timepoint_i) = u_t_mdl.Coefficients.pValue(2) < regAlpha; % ssd
+    glm_output.ssd.pvals(1,timepoint_i) = u_t_mdl.Coefficients.pValue(2); % ssd
+    glm_output.ssd.beta_weights(1,timepoint_i) = u_t_mdl.Coefficients.Estimate(2); % ssd
+    glm_output.ssd.permPos(1,timepoint_i) = permLoc;
+    glm_output.ssd.permSig(1,timepoint_i) = abs(permLoc-250)>238;
+%     % - Value
+%     glm_output.ssd.sig_times(2,timepoint_i) = u_t_mdl.Coefficients.pValue(3) < .01; % value
+%     glm_output.ssd.beta_weights(2,timepoint_i) = u_t_mdl.Coefficients.tStat(3); % value
+%         
+%     % - SSD x Value
+%     glm_output.ssd.sig_times(3,timepoint_i) = u_t_mdl.Coefficients.pValue(5) < .01; % ssd x value
+%     glm_output.ssd.beta_weights(3,timepoint_i) = u_t_mdl.Coefficients.tStat(5); % % ssd x value
+    
+    % - Trial number
+    glm_output.ssd.sig_times(2,timepoint_i) = u_t_mdl.Coefficients.pValue(3) < .01; % trial_number
+    glm_output.ssd.beta_weights(2,timepoint_i) = u_t_mdl.Coefficients.tStat(3); % trial_number
+
+    
+end
+%% determine if there is a difference between cancelled and noncancelled
+glm_output.nonCanc.sig_times = []; 
+glm_output.nonCanc.beta_weights = []; 
+u_t_mdl = [];
+
+reg_tbl_canc = reg_tbl(reg_tbl.trial_type == 2 | reg_tbl.trial_type == 3,:);
+
+for timepoint_i = 1:n_times
+    
+    % Input the timepoint specific firing times
+    reg_tbl_canc.firing_rate = reg_tbl_canc.win_fr(:,timepoint_i);    
+    
+    % Fit the GLM for this
+    u_t_mdl = fitlm(reg_tbl_canc,'firing_rate ~ is_canc + trl_numZ');
+    
+    % GLM output ---------------------------------
+    % - Trial type
+    glm_output.nonCanc.sig_times(1,timepoint_i) = u_t_mdl.Coefficients.pValue(2) < regAlpha; % trial type
+    glm_output.nonCanc.beta_weights(1,timepoint_i) = u_t_mdl.Coefficients.tStat(2); % trial type
+    
+    % - Trial number
+    glm_output.nonCanc.sig_times(2,timepoint_i) = u_t_mdl.Coefficients.pValue(3) < .01; % trial_number
+    glm_output.nonCanc.beta_weights(2,timepoint_i) = u_t_mdl.Coefficients.tStat(3); % trial_number
+    
+end
+%% seen vs unseen
+glm_output.seen.sig_times = []; 
+glm_output.seen.beta_weights = []; 
+u_t_mdl = []; 
+trlInds = reg_tbl.trial_number;
+matchedInds = trlMatcherNC(behData);
+matchedInds = trlInds(ismember(trlInds,matchedInds));
+goodMatchedInd = goodTrlNums(ismember(goodTrlNums,matchedInds));
+
+reg_tbl_seen = reg_tbl(goodMatchedInd,:);
+
+for timepoint_i = 1:n_times
+    
+    % Input the timepoint specific firing times
+    reg_tbl_seen.firing_rate = reg_tbl_seen.win_fr(:,timepoint_i);  
+    
+    % Fit the GLM for this
+    u_t_mdl = fitlm(reg_tbl_seen,'firing_rate ~ seen + trl_numZ');
+    
+    % GLM output ---------------------------------
+    % - Trial type
+    glm_output.seen.sig_times(1,timepoint_i) = u_t_mdl.Coefficients.pValue(2) < regAlpha; % trial type
+    glm_output.seen.beta_weights(1,timepoint_i) = u_t_mdl.Coefficients.tStat(2); % trial type
+    
+    % - Trial number
+    glm_output.seen.sig_times(2,timepoint_i) = u_t_mdl.Coefficients.pValue(3) < .01; % trial_number
+    glm_output.seen.beta_weights(2,timepoint_i) = u_t_mdl.Coefficients.tStat(3); % trial_number
+    
+end
+
+%% Determine periods of significance
+%if seen isn't significant, we don't care about SSD being significant
+% glm_output.ssd.sig_times(1,glm_output.seen.sig_times(1,:) ==0)=0;
+% 
+%if conflict isn't significant, we don't care about SSD being significant
+glm_output.ssd.sig_times(1,glm_output.trial_type.sig_times(1,:) ==0)=0;
+
+% check that conflict modulation is positive
+% glm_output.trial_type.sig_times(1,glm_output.trial_type.beta_weights(1,:)<0)=0;
+% 
+% %if noncacelled is higher, we don't care
+% glm_output.nonCanc.sig_times(1,glm_output.nonCanc.beta_weights(1,:)<0) = 0;
+% 
+
+% 
+% %now confirm that the SSD increases FR
+% glm_output.ssd.sig_times(1,glm_output.ssd.beta_weights(1,:)<0)=0;
+% 
+% %only care about seen if SSD is significant
+% glm_output.seen.sig_times(1,glm_output.ssd.sig_times(1,:)==0) = 0;
+% 
+% %only care about seen if seen is higher
+% glm_output.seen.sig_times(1,glm_output.seen.beta_weights(1,:)<0) = 0;
+
+
+signal_detect_length = 50;
+signal_detect_wins = signal_detect_length/window_shift;
+
+% now ask whether this unit was significant with significance defined as at least
+% 100ms of selectivity following SSD
+
+% Trial-type
+[~, canc_sig_len, ~] = ZeroOnesCount(glm_output.trial_type.sig_times(1,:)); % choice direction
+
+% Stop-signal delay
+[~, ssd_sig_len, ~] = ZeroOnesCount(glm_output.ssd.sig_times(1,:) ); % choice direction
+
+% nonCanc
+[~, noncanc_sig_len, ~] = ZeroOnesCount(glm_output.nonCanc.sig_times(1,:)); % choice direction
+
+% Seen
+[~, seen_sig_len, ~] = ZeroOnesCount(glm_output.seen.sig_times(1,:)); % choice direction
+
+% SSD perm
+[~, ssdP_sig_len, ~] = ZeroOnesCount(glm_output.ssd.permSig(1,:)); % choice direction
+
+
+encoding_flag = []; encoding_beta = [];
+
+
+encoding_flag(1,1) = any(canc_sig_len >= signal_detect_wins);
+encoding_flag(1,2) = any(ssd_sig_len >= signal_detect_wins);
+encoding_flag(1,3) = any(noncanc_sig_len >= signal_detect_wins);
+encoding_flag(1,4) = any(seen_sig_len >= signal_detect_wins);
+encoding_flag(1,5) = any(ssdP_sig_len >= signal_detect_wins);
+
+
+% Get average beta-weights
+encoding_beta(1,1) = nanmean(glm_output.trial_type.beta_weights(1,...
+    glm_output.trial_type.sig_times(1,:)==1));
+encoding_beta(1,2) = nanmean(glm_output.ssd.beta_weights(1,...
+    glm_output.ssd.sig_times(1,:)==1));
+encoding_beta(1,3) = nanmean(glm_output.nonCanc.beta_weights(1,...
+    glm_output.nonCanc.sig_times(1,:)==1));
+encoding_beta(1,4) = nanmean(glm_output.seen.beta_weights(1,...
+    glm_output.seen.sig_times(1,:)==1));
+
+
+
+%% Workpad: figure checks
+% % 
+% fr_times = -0:10:450;
+% window_time = -1000:2000;
+% figure;
+% subplot(4,2,[1 3]); hold on
+% plot(-1000:2000,nanmean(sdfs(reg_tbl.trial_type==2,:)),'r')
+% plot(window_time,nanmean(sdfs(reg_tbl.trial_type==1,:)),'k')
+% xlim([-250 1000])
+% % 
+% subplot(4,2,5)
+% imagesc('XData',fr_times,'YData',ones(1,length(window_time)),'CData',glm_output.trial_type.sig_times(1,:))
+% xlim([-250 1000])
+% 
+% subplot(4,2,7)
+% plot(fr_times, glm_output.trial_type.beta_weights(1,:))
+% xlim([-250 1000])
+% 
+% 
+% subplot(4,2,[2 4]); hold on
+% plot(window_time,nanmean(sdfs(reg_tbl.ssd== 1,:)),'color',[1 0 0 0.33])
+% plot(window_time,nanmean(sdfs(reg_tbl.ssd==2,:)),'color',[1 0 0 0.66])
+% plot(window_time,nanmean(sdfs(reg_tbl.ssd==3,:)),'color',[1 0 0 0.99])
+% xlim([-250 1000])
+% 
+% subplot(4,2,6)
+% imagesc('XData',fr_times,'YData',ones(1,length(fr_times)),'CData',glm_output.ssd.sig_times(1,:))
+% xlim([-250 1000])
+% 
+% subplot(4,2,8)
+% plot(fr_times, glm_output.ssd.beta_weights(1,:))
+% xlim([-250 1000])
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
