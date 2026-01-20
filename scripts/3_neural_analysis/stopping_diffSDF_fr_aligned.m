@@ -209,7 +209,7 @@ reg_tbl.sdfs3k(matchedInds,:) = event_SDFs(matchedInds,:);
 reg_tbl.matched_rasters3k(matchedInds,:) = eventRasters(matchedInds,1:3001);
 
 reg_tbl_error = reg_tbl(matchedInds,:);
-rng(888)
+rng(999)
 [errorCI, errorDiff, ~,actualDataError] = ...
                 calculatePermutationContinuity(reg_tbl_error.sdfs3k,...
                 reg_tbl_error.trial_type==1,reg_tbl_error.trial_type==3,contFiller);
