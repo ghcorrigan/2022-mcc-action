@@ -1,6 +1,7 @@
 function [glm_output, encoding_flag, inh_pnc,errTable] = ...
-    stopping_diffSDF_fr_aligned(neuron_i, mcc_map_info, behData)
-rng(1988)
+    stopping_diffSDF_fr_aligned(neuron_i, mcc_map_info, behData,dirs)
+rng(99999999)
+randi(50)
 neuralFilename = mcc_map_info.session{neuron_i};
 neuronLabel = mcc_map_info.unit{neuron_i};
 % fprintf('Extracting: %s - %s ... [%i of %i]  \n',neuralFilename,neuronLabel,neuron_i,size(mcc_map_info,1))
@@ -11,8 +12,8 @@ neuronLabel = mcc_map_info.unit{neuron_i};
 regAlpha = .05;
 doPerm = 0;
 contFiller = 20;
-load(['E:\conflict\results\DATA_SPK_STATIONARITY\Ben\stationarityData_' mcc_map_info.probeName{neuron_i}])
-load(['E:\conflict\results\probeTrls\neuronData_' mcc_map_info.probeName{neuron_i}])
+load([ dirs.results '\DATA_SPK_STATIONARITY\Ben\stationarityData_' mcc_map_info.probeName{neuron_i}])
+load([ dirs.results '\probeTrls\neuronData_' mcc_map_info.probeName{neuron_i}])
 tempInd = find(contains(neuronData.DSPname,neuronLabel));
 stationInd = stationaritySelection.included_trials.neuronIdx == tempInd;
 rightInds = getDir(behData.ttx);
@@ -121,7 +122,7 @@ if height(reg_tbl(goodtrls,:))==0 || sum(reg_tbl.trial_type(goodtrls)==2)<30
     return
 end
 %% Setup spike data into GLM
-spk_data_in = load(fullfile('E:\conflict\data\','Spikes',...
+spk_data_in = load(fullfile(dirs.data,'Spikes',...
     [neuralFilename '_Spikes_' neuronLabel '.mat']));
 event_alignment = 'ssrt';
 % allSDFSS = getIndividSDF_MCC(spk_data_in.Spikes,event_alignment);
@@ -208,7 +209,7 @@ reg_tbl.sdfs3k(matchedInds,:) = event_SDFs(matchedInds,:);
 reg_tbl.matched_rasters3k(matchedInds,:) = eventRasters(matchedInds,1:3001);
 
 reg_tbl_error = reg_tbl(matchedInds,:);
-
+rng(888)
 [errorCI, errorDiff, ~,actualDataError] = ...
                 calculatePermutationContinuity(reg_tbl_error.sdfs3k,...
                 reg_tbl_error.trial_type==1,reg_tbl_error.trial_type==3,contFiller);

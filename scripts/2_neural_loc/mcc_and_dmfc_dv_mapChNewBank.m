@@ -1,4 +1,4 @@
-function [area_map_info,bankInfo] = mcc_and_dmfc_dv_mapChNewBank(dajo_datamap_curated, behavior, dirs)
+function [area_map_info,bankInfo] = mcc_and_dmfc_dv_mapChNewBank(dajo_datamap_curated, behavior, dirs,ephysLog)
 % Get session information and indices
 n_sessions = size(dajo_datamap_curated,1);
 area_map_info = [];
@@ -8,7 +8,7 @@ for session_i = 1:n_sessions
     neuralFilename = dajo_datamap_curated.dataFilename{session_i};
     behFilename = data_findBehFile(neuralFilename);
     beh_index = util_find_beh_index(behavior,behFilename);
-    logInfo(session_i,:) = util_getLogInfo(neuralFilename);
+    logInfo(session_i,:) = util_getLogInfo(neuralFilename,ephysLog);
     
     fprintf(['Extracting data for ' neuralFilename ': session %i of %i     \n'],...
         session_i, n_sessions);

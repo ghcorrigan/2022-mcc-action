@@ -136,7 +136,7 @@ parfor neuron_i = 1:size(mcc_map_info,1)
     sdf_highRwd(neuron_i,:) = nanmean(z_sdf(behavior(behaviorIdx,:).ttx.canceled.all.hi,:));
     sdf_lowRwd(neuron_i,:) = nanmean(z_sdf(behavior(behaviorIdx,:).ttx.canceled.all.lo,:));
 end
-    save([dirs.results '\' region 'SDFDiff_workspaceA102dirPNCDirVal3knew.mat'])
+    save(['E:\conflict\results\' region 'SDFDiff_workspaceA102dirPNCDirVal3knew.mat'])
 
 end
 %% Export: export table for future analyses

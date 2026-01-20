@@ -1,5 +1,4 @@
-function logInfo = util_getLogInfo(neuralFilename)
-    ephysLog = importOnlineEphysLogMaster;
+function logInfo = util_getLogInfo(neuralFilename,ephysLog)
     log_i = find(strcmp(ephysLog.Session,neuralFilename));
     
     ap_stereo = str2num(ephysLog.AP_Stereotaxic{log_i});

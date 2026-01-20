@@ -1,18 +1,20 @@
 function dirs = get_dirs_mcc(user)
-
+user = user(1:end-1);
 switch user
-    case 'robarts'
+    case 'rri-martinez3'
         dirs.root = 'E:\conflict\analyses';
         dirs.toolbox = 'E:\conflict\analyses\toolbox';
         dirs.dajo_toolbox = 'E:\conflict\analyses\2022-dajo-toolbox-main';
         dirs.data = 'E:\conflict\data';
+        dirs.results = 'E:\conflict\results';
         
-    case 'home'
-        dirs.root = 'D:\projects\2022-mcc-action';
-        dirs.toolbox = 'D:\projects\toolbox\';
-        dirs.dajo_toolbox = 'D:\projects\2022-dajo-toolbox';
-        dirs.data = 'D:\data\2021_Cmand_DaJo';
-       
+    case 'DataCruncher'
+        dirs.root = 'L:\conflict\analyses';
+        dirs.toolbox = 'L:\conflict\analyses\toolbox';
+        dirs.dajo_toolbox = 'L:\conflict\analyses\2022-dajo-toolbox-main';
+        dirs.data = 'L:\conflict\data';
+        dirs.results = 'L:\conflict\results';
+
 end
 
 addpath(genpath(dirs.root));
